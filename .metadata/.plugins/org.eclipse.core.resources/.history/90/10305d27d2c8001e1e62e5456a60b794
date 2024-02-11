@@ -1,0 +1,229 @@
+package com.example.demo.service;
+
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+
+import com.example.demo.Repo.CityRepo;
+import com.example.demo.Repo.RoleRepo;
+import com.example.demo.Repo.StateRepo;
+import com.example.demo.Repo.UserRepo;
+import com.example.demo.ResponseStatus.ResponseStatus;
+import com.example.demo.dto.UserDTO;
+import com.example.demo.entity.CityEntity;
+import com.example.demo.entity.StateEntity;
+import com.example.demo.entity.UserEntity;
+import com.example.demo.response.Response;
+import com.example.demo.restTemplate.Rest_Template;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+
+
+
+@Service
+public class UserService {
+	
+	@Autowired
+	UserRepo userrepo;
+	@Autowired
+	CityRepo cityrepo;
+	@Autowired
+	StateRepo staterepo;
+	@Autowired
+	RoleRepo rolerepo;
+	
+	@Autowired
+	Rest_Template restTemplate;
+	
+
+	public ResponseStatus addUser(UserDTO user) {
+	    int state_id;
+	    int city_state_id;
+	    System.out.println("Entered in the Service Layer");
+//	    if (userrepo.existsById(user.getUid())) {
+//	        return new ResponseStatus("error", "User Already Present");
+//	    }
+	    if (userrepo.existsByUsername(user.getUsername())) {
+	        return new ResponseStatus("error", "UserName Taken");
+	    }
+	    if (!staterepo.existsByState(user.getState_name())) {
+	        return new ResponseStatus("error", "Invalid State");
+	    } else {
+	        state_id = staterepo.findByState(user.getState_name()).getState_id();
+	    }
+	    if (cityrepo.existsByCity(user.getCity_name())) {
+	        CityEntity temp_city = cityrepo.getByCity(user.getCity_name());
+	        city_state_id = temp_city.getState_id().getState_id();
+	        if (city_state_id != state_id) {
+	            return new ResponseStatus("error", "State and City Doesn't Match");
+	        }
+	    } else {
+	        return new ResponseStatus("error", "Invalid City");
+	    }
+	    if (!rolerepo.existsByRole(user.getRole_name())) {
+	        return new ResponseStatus("error", "Invalid Role");
+	    }
+	    if (!user.getPassword().matches("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@#$%^&+=!])(?!.*\\s).{8,}$")) {
+	        return new ResponseStatus("error", "Invalid Password");
+	    }
+	    if (!user.getUsername().matches("^[^\\s]+$")) {
+	        return new ResponseStatus("error", "Invalid Username");
+	    }
+
+	    UserEntity newUser = new UserEntity();
+	    newUser.setUsername(user.getUsername());
+	    newUser.setPassword(user.getPassword());
+	    newUser.setName(user.getName());
+	    newUser.setDob(user.getDob());
+	    newUser.setRole_id(rolerepo.findByRole(user.getRole_name()));
+	    newUser.setCreated_date(LocalDateTime.now(ZoneId.of("Asia/Kolkata")));
+	    newUser.setModified_date(LocalDateTime.now(ZoneId.of("Asia/Kolkata")));
+	    newUser.setState_id(staterepo.findByState(user.getState_name()));
+	    newUser.setCity_id(cityrepo.findByCity(user.getCity_name()));
+	    newUser.setPincode(user.getPincode());
+	    newUser.setStatus(1);
+	    newUser.setEmail(user.getEmail());
+
+	    userrepo.save(newUser);
+	    System.out.print(user);
+	    
+	    return new ResponseStatus("OK", "State Added");
+	}
+
+	public List<UserDTO> getUsers() {
+		
+
+		List<UserEntity> users = userrepo.findAll();
+		List<UserDTO> resp = new ArrayList<UserDTO>();
+		
+		for(int i = 0;i<users.size();i++)
+		{
+			UserDTO user = new UserDTO();
+
+			UserEntity i_user = users.get(i);
+			user.setUsername(i_user.getUsername());
+			user.setPassword(i_user.getPassword());
+			user.setName(i_user.getName());
+			user.setDob(i_user.getDob());
+			user.setPincode(i_user.getPincode());
+			user.setStatus(i_user.getStatus());
+			user.setEmail(i_user.getEmail());
+		
+			user.setState_name(i_user.getState_id().getState());  //i_user.getState_id() will return the StateEntity Object
+			user.setCity_name(i_user.getCity_id().getCity());     //.getState() will return the state_name in that object						
+			user.setRole_name(i_user.getRole_id().getRole());
+			resp.add(user);
+	
+		}
+		return resp; 
+	}
+	
+	
+//	public String ApiCalling (String url) {
+//		try {
+//		HttpHeaders headers = new HttpHeaders();
+//	    headers.setAccept(Arrays.asList(MediaType.APPLICATION_JSON));
+//	    
+//	    HttpEntity<String> entity = new HttpEntity<String>("parameters",headers); 
+//	    
+//	    ResponseEntity<String> resp = restTemplate.exchange(getStateByNameURL,HttpMethod.GET,entity,String.class);	
+//	    String responseBody = resp.getBody();
+//	    String responseValue = "";
+//	    try {
+//	        ObjectMapper objectMapper = new ObjectMapper();
+//	        JsonNode rootNode = objectMapper.readTree(responseBody);
+//	        JsonNode responseNode = rootNode.get("response");
+//	        if (responseNode != null) {
+//	            responseValue = responseNode.asText();
+//	        }
+//	    } catch (Exception e) {
+//	        e.printStackTrace(); // Handle parsing exception gracefully
+//	    }
+//		return responseValue;
+//		
+//		}catch(Exception e)
+//		{
+//			System.out.println("In catch UserService"+e.getMessage());
+//            return (e.getMessage());																			 //state_id passed then the exchange method will raise an exception with json got from there
+//																			 //and we can give that as reply
+//			                                                                 //Sample e.getMessage(): "{"timestamp":"2024-02-09 00:29:29","status":400,"statusMsg":"400 BAD_REQUEST","response":"State Not Found"}"
+//		}
+//		
+//	}
+	
+	private static  String getStateByNameURL  = "http://localhost:8081/getStateById/";
+	private static  String getCityByNameURL   = "http://localhost:8081/getCityById/";
+    private static String  getRoleByNameURL   = "http://localhost:8081/getRoleById/";
+	public Response getUserById(int uid) {
+		int role_id = 1;
+		int state_id = 1;
+		int city_id = 1;
+		getRoleByNameURL = getRoleByNameURL+role_id;
+		getStateByNameURL = getStateByNameURL+state_id;
+		getCityByNameURL = getCityByNameURL+city_id;
+
+		UserEntity user_entity = userrepo.findById(uid);
+		
+		UserDTO user_resp = new UserDTO();
+		
+		user_resp.setUsername(user_entity.getUsername());
+		user_resp.setPassword(user_entity.getPassword());
+		user_resp.setDob(user_entity.getDob());
+		user_resp.setEmail(user_entity.getEmail());
+		user_resp.setName(user_entity.getName());
+		user_resp.setEmail(user_entity.getEmail());
+		
+		try {
+			
+			Response res_state_name = restTemplate.getStateByIdApiCalling(getStateByNameURL);
+		    LinkedHashMap<String, Object> responseData = (LinkedHashMap<String, Object>) res_state_name.getResponse();
+		    String stateValue = (String) responseData.get("state");
+		    System.out.println(stateValue);
+			
+		}catch(Exception e) {
+			System.out.println("In UserService catch and in StateAPI call"+e.getMessage());
+			return null;
+		}
+        try {
+			
+			Response res_city_name = restTemplate.getCityByIdApiCalling(getCityByNameURL);
+		    LinkedHashMap<String, Object> responseData = (LinkedHashMap<String, Object>) res_city_name.getResponse();
+		    String cityValue = (String) responseData.get("city");
+		    System.out.println(cityValue);
+			
+		}catch(Exception e) {
+			System.out.println("In UserService catch and in CityAPI call"+e.getMessage());
+			return null;
+		}
+		  try {
+			
+			
+			Response res_role_name = restTemplate.getRoleByIdApiCalling(getRoleByNameURL);
+		    LinkedHashMap<String, Object> responseData = (LinkedHashMap<String, Object>) res_role_name.getResponse();
+		    String roleValue = (String) responseData.get("role");
+		    System.out.println(roleValue);
+			
+		  }catch(Exception e) {
+			System.out.println("In UserService catch and in RoleAPI Call"+e.getMessage());
+			
+		  }
+		
+    return  null;
+	}//end of getUserById
+  
+	if (res_user_entity	!= null) {
+		
+	    return new Response(200,"User Found",res_user_entity);
+	} else {
+	    return new Response(404,"User Not Found",null);
+
+	}
+	
+
+}

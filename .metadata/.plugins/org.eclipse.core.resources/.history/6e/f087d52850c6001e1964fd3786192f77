@@ -1,0 +1,55 @@
+package com.example.demo.service;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.example.demo.Repo.StateRepo;
+import com.example.demo.ResponseStatus.ResponseStatus;
+import com.example.demo.dto.StateDTO;
+import com.example.demo.entity.StateEntity;
+
+@Service
+public class StateService {
+
+    @Autowired
+    StateRepo staterepo;
+    
+    public ResponseStatus addStates(List<StateDTO> states) {
+        System.out.println("Entered in the Service Layer");
+        try {
+            for (StateDTO state : states) {
+                if ((staterepo.existsById(state.getState_id())) || (staterepo.existsByState(state.getState()))) {
+                    return new ResponseStatus("error", "State Already Present: " + state.getState());
+                }
+
+                StateEntity newState = new StateEntity();
+                newState.setState_id(state.getState_id());
+                newState.setState(state.getState());
+                newState.setIsUnionTerritory(state.getIsUnionTerritory().equals("yes") ? 1 : 0);
+
+                staterepo.save(newState);
+                System.out.print(newState);
+            }
+
+            return new ResponseStatus("OK", "States Added");
+        } catch (Exception e) {
+            return new ResponseStatus("error", "Failed to add states: " + e.getMessage());
+        }
+    }
+
+    public List<StateDTO> getStates() {
+        List<StateEntity> states = staterepo.findAll();
+        List<StateDTO> resp = new ArrayList<>();
+        for (StateEntity stateEntity : states) {
+            StateDTO stateDTO = new StateDTO();
+            stateDTO.setState_id(stateEntity.getState_id());
+            stateDTO.setState(stateEntity.getState());
+            stateDTO.setIsUnionTerritory(stateEntity.getIsUnionTerritory() == 0 ? "no" : "yes");
+            resp.add(stateDTO);
+        }
+        return resp;
+    }
+}
